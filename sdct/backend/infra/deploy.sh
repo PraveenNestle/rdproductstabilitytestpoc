@@ -42,7 +42,7 @@ echo "== 4/6 Package and deploy (dist + sdct/backend/api)"
 TMP=$(mktemp -d); mkdir -p "$TMP/frontend" "$TMP/backend"
 cp -r "$ROOT/dist" "$TMP/dist"; cp -r "$APP_ROOT/backend/api" "$TMP/backend/api"; rm -rf "$TMP/backend/api/node_modules"
 cat > "$TMP/package.json" <<'PKG'
-{ "name": "stability-capture-webapp", "private": true, "scripts": { "start": "npm start --prefix backend/api", "postinstall": "npm ci --omit=dev --omit=optional --prefix backend/api" } }
+{ "name": "stability-capture-webapp", "private": true, "scripts": { "start": "node backend/api/src/server.js", "postinstall": "npm ci --omit=dev --omit=optional --prefix backend/api" } }
 PKG
 (cd "$TMP" && zip -qr deploy.zip .)
 az webapp deploy -g "$RG" -n "$APP_NAME" --src-path "$TMP/deploy.zip" --type zip -o none

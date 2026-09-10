@@ -119,7 +119,7 @@ resource web 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       http20Enabled: true
-      appCommandLine: 'npm start --prefix backend/api'
+      appCommandLine: 'npm start'
       appSettings: [
         { name: 'PORT', value: '8080' }
         { name: 'LOCAL_MODE', value: 'false' }
