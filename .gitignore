@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-mockup/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+
+# Local Azure and editor state
+.azure/
+.vscode/
