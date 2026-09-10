@@ -5,6 +5,7 @@
 //   node import_reference.mjs --bundle exports/reference_bundle.json            # one JSON file with all entities
 //   node import_reference.mjs --csv-dir exports/2026-08-31                     # projects.csv, ars.csv, trials.csv, variants.csv, samples.csv, plans.csv, users.csv
 //   node import_reference.mjs --bundle b.json --dry-run                        # validate only
+//   node import_reference.mjs --demo                                           # seed bundled reference data
 //
 // Env: STORAGE_ACCOUNT_NAME (or STORAGE_CONNECTION_STRING), CONTAINER_REFERENCE (default: reference).
 // plans.csv: conditions and timePoints are pipe-separated (e.g. "4C|25C|35C|45C", "T0|1M|3M|6M|9M|12M").
@@ -46,14 +47,17 @@ const coerce = {
 };
 
 let bundle;
-if (args.bundle) bundle = JSON.parse(readFileSync(args.bundle, 'utf8'));
+if (args.demo) {
+  const demo = JSON.parse(readFileSync(new URL('../src/data/demo_dataset.json', here), 'utf8'));
+  bundle = { source: 'DEMO_SEED', exportedAt: new Date().toISOString(), projects: demo.projects, ars: demo.ars, trials: demo.trials, variants: demo.variants, samples: demo.samples, plans: demo.plans, users: demo.users };
+} else if (args.bundle) bundle = JSON.parse(readFileSync(args.bundle, 'utf8'));
 else if (args['csv-dir']) {
   bundle = { source: `CSV export ${args['csv-dir']}`, exportedAt: new Date().toISOString() };
   for (const [entity, file] of Object.entries(FILES)) {
     const p = join(args['csv-dir'], `${file}.csv`);
     if (existsSync(p)) bundle[entity] = parseCsv(readFileSync(p, 'utf8')).map((r) => (coerce[entity] ? coerce[entity](r) : r));
   }
-} else { console.error('Usage: import_reference.mjs --bundle file.json | --csv-dir folder [--dry-run]'); process.exit(2); }
+} else { console.error('Usage: import_reference.mjs --demo | --bundle file.json | --csv-dir folder [--dry-run]'); process.exit(2); }
 
 if (!validate(bundle)) { console.error('Bundle failed schema validation:'); validate.errors.slice(0, 30).forEach((e) => console.error(` ${e.instancePath || '/'} ${e.message}`)); process.exit(1); }
 const counts = Object.fromEntries(Object.keys(FILES).map((e) => [e, (bundle[e] || []).length]));
