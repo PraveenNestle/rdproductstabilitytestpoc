@@ -3,7 +3,9 @@
 //   Production    -> Microsoft Entra ID via @azure/msal-browser; roles come from the app-role claim on the id token
 import { users as demoUsers } from '../api/demoData.js';
 
-const MODE = import.meta.env.DEV ? 'demo' : (import.meta.env.VITE_AUTH_MODE === 'msal' && import.meta.env.VITE_ENTRA_CLIENT_ID ? 'msal' : 'demo');
+const runtimeConfig = globalThis.__STABILITY_CAPTURE_CONFIG__ || {};
+const env = (name) => runtimeConfig[name] ?? import.meta.env[name] ?? '';
+const MODE = import.meta.env.DEV ? 'demo' : (env('VITE_AUTH_MODE') === 'msal' && env('VITE_ENTRA_CLIENT_ID') ? 'msal' : 'demo');
 let msal = null; let account = null;
 let currentDemoUser = demoUsers[2];
 const listeners = new Set();
@@ -23,13 +25,13 @@ export async function initAuth() {
   if (MODE !== 'msal') return currentUser();
   const { PublicClientApplication } = await import('@azure/msal-browser');
   msal = new PublicClientApplication({
-    auth: { clientId: import.meta.env.VITE_ENTRA_CLIENT_ID, authority: `https://login.microsoftonline.com/${import.meta.env.VITE_ENTRA_TENANT_ID}`, redirectUri: window.location.origin },
+    auth: { clientId: env('VITE_ENTRA_CLIENT_ID'), authority: `https://login.microsoftonline.com/${env('VITE_ENTRA_TENANT_ID')}`, redirectUri: window.location.origin },
     cache: { cacheLocation: 'sessionStorage' },
   });
   await msal.initialize();
   const result = await msal.handleRedirectPromise();
   account = result?.account || msal.getAllAccounts()[0] || null;
-  if (!account) { await msal.loginRedirect({ scopes: [import.meta.env.VITE_API_SCOPE] }); return null; }
+  if (!account) { await msal.loginRedirect({ scopes: [env('VITE_API_SCOPE')] }); return null; }
   return currentUser();
 }
 
@@ -46,10 +48,10 @@ export function currentUser() {
 export async function getAccessToken() {
   if (MODE !== 'msal' || !msal || !account) return null;
   try {
-    const r = await msal.acquireTokenSilent({ scopes: [import.meta.env.VITE_API_SCOPE], account });
+    const r = await msal.acquireTokenSilent({ scopes: [env('VITE_API_SCOPE')], account });
     return r.accessToken;
   } catch {
-    await msal.acquireTokenRedirect({ scopes: [import.meta.env.VITE_API_SCOPE], account });
+    await msal.acquireTokenRedirect({ scopes: [env('VITE_API_SCOPE')], account });
     return null;
   }
 }

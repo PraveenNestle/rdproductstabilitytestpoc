@@ -16,6 +16,18 @@ app.use(cors({ origin: config.allowedOrigins.length ? config.allowedOrigins : tr
 app.use(express.json({ limit: '4mb' }));
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+app.get('/runtime-config.js', (req, res) => {
+  const publicConfig = {
+    VITE_API_BASE: process.env.VITE_API_BASE || '',
+    VITE_USE_RELATIVE_API: process.env.VITE_USE_RELATIVE_API || 'true',
+    VITE_AUTH_MODE: process.env.VITE_AUTH_MODE || (process.env.VITE_ENTRA_CLIENT_ID ? 'msal' : ''),
+    VITE_ENTRA_CLIENT_ID: process.env.VITE_ENTRA_CLIENT_ID || '',
+    VITE_ENTRA_TENANT_ID: process.env.VITE_ENTRA_TENANT_ID || config.entra.tenantId,
+    VITE_API_SCOPE: process.env.VITE_API_SCOPE || (config.entra.audience ? `${config.entra.audience.replace(/\/$/, '')}/access_as_user` : ''),
+  };
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/javascript').send(`window.__STABILITY_CAPTURE_CONFIG__=${JSON.stringify(publicConfig)};`);
+});
 app.get('/api/health', (req, res) => res.json({ ok: true, mode: config.localMode ? 'local' : 'azure', time: new Date().toISOString() }));
 
 const api = express.Router();

@@ -4,9 +4,13 @@ import { uuid } from '../lib/format.js';
 import { observationBlobPath } from '../lib/naming.js';
 import { getAccessToken } from '../auth/auth.js';
 
-const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
-export const DEMO_MODE = import.meta.env.DEV || import.meta.env.MODE === 'mockup' || (import.meta.env.MODE !== 'production' && !API_BASE && !import.meta.env.VITE_FORCE_API);
-const USE_RELATIVE_API = !API_BASE && !DEMO_MODE;
+const runtimeConfig = globalThis.__STABILITY_CAPTURE_CONFIG__ || {};
+const env = (name) => runtimeConfig[name] ?? import.meta.env[name] ?? '';
+const API_BASE = (env('VITE_API_BASE') || '').replace(/\/$/, '');
+const forceApi = env('VITE_FORCE_API');
+const authMode = env('VITE_AUTH_MODE');
+export const DEMO_MODE = import.meta.env.DEV || import.meta.env.MODE === 'mockup' || (authMode !== 'msal' && import.meta.env.MODE !== 'production' && !API_BASE && !forceApi);
+const USE_RELATIVE_API = env('VITE_USE_RELATIVE_API') === 'true' || (!API_BASE && !DEMO_MODE);
 
 // -------------------------------------------------------------------------------------------------
 // Demo implementation: everything in memory, same shapes as the Express API
