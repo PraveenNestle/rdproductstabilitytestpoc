@@ -21,6 +21,7 @@ export function ReviewScreen({ catalog, user, focusId, onOpenCapture }) {
   const [f, setF] = useState({ projectCode: '', arNumber: '', trialNumber: '', status: '', timePointCode: '', conditionCode: '', defect: '' });
   const [selectedId, setSelectedId] = useState(focusId || null);
   const [view, setView] = useState('timeline');
+  useEffect(() => { if (focusId) setSelectedId(focusId); }, [focusId]);
   const vocabIndex = useMemo(() => Object.fromEntries(catalog.vocabularies.map((v) => [v.code, Object.fromEntries(v.values.map((x) => [x.code, x.label]))])), [catalog]);
 
   const load = () => api.listObservations({ projectCode: f.projectCode, arNumber: f.arNumber, trialNumber: f.trialNumber, status: f.status }).then(setRows);

@@ -1,9 +1,9 @@
 // Authentication (R-29) and role-based access (R-30).
-//   VITE_AUTH_MODE=msal  -> Microsoft Entra ID via @azure/msal-browser; roles come from the app-role claim on the id token
-//   otherwise            -> demo personas (scientist / reviewer / admin) so RBAC can be exercised without a tenant
+//   DEV / local  -> demo personas (no auth)
+//   Production    -> Microsoft Entra ID via @azure/msal-browser; roles come from the app-role claim on the id token
 import { users as demoUsers } from '../api/demoData.js';
 
-const MODE = import.meta.env.VITE_AUTH_MODE === 'msal' && import.meta.env.VITE_ENTRA_CLIENT_ID ? 'msal' : 'demo';
+const MODE = import.meta.env.DEV ? 'demo' : (import.meta.env.VITE_AUTH_MODE === 'msal' && import.meta.env.VITE_ENTRA_CLIENT_ID ? 'msal' : 'demo');
 let msal = null; let account = null;
 let currentDemoUser = demoUsers[2];
 const listeners = new Set();

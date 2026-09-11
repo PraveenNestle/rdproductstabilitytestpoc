@@ -63,3 +63,7 @@ export function mediaBlobPath(ctx, filename) {
 export function observationBlobPath(ctx, observationId) {
   return [sanitizeToken(ctx.projectCode, { allowHyphen: false }), sanitizeToken(ctx.arNumber), sanitizeToken(ctx.trialNumber), `${observationId}.json`].join('/');
 }
+
+export function observationDisplayName(ctx) {
+  return [ctx.sampleCode, ctx.variantNumber, ctx.conditionCode].filter(Boolean).join('-');
+}

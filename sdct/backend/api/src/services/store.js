@@ -4,7 +4,7 @@ import addFormats from 'ajv-formats';
 import { config } from '../config.js';
 import { blob } from './blob.js';
 import { reference, demoDataset } from './reference.js';
-import { standardFilename, mediaBlobPath, observationBlobPath } from './naming.js';
+import { standardFilename, mediaBlobPath, observationBlobPath, observationDisplayName } from './naming.js';
 
 const catalogJson = JSON.parse(readFileSync(new URL('../data/catalog.json', import.meta.url)));
 const schema = JSON.parse(readFileSync(new URL('../data/observation.schema.json', import.meta.url)));
@@ -15,7 +15,7 @@ const C = config.storage.containers;
 export const FILENAME_RE = /^[A-Z0-9]+(_[A-Z0-9-]+){6,8}_[0-9]{8}-[0-9]{6}_[0-9]{2}\.[a-z0-9]+$/;
 
 // ---------------------------------------------------------------------------------------------- in-memory index (LOCAL_MODE only)
-const local = { observations: config.localMode ? demoDataset.observations.map((o) => ({ ...o, storage: { container: C.observations, blobPath: observationBlobPath(o.context, o.observationId) } })) : [], audit: config.localMode ? [...demoDataset.auditLog] : [], templates: null, vocabularies: null };
+const local = { observations: config.localMode ? demoDataset.observations.map((o) => ({ ...o, displayName: observationDisplayName(o.context), storage: { container: C.observations, blobPath: observationBlobPath(o.context, o.observationId, observationDisplayName(o.context)) } })) : [], audit: config.localMode ? [...demoDataset.auditLog] : [], templates: null, vocabularies: null };
 
 // ---------------------------------------------------------------------------------------------- config (templates, vocabularies)
 export const configStore = {
@@ -68,7 +68,7 @@ export const audit = {
 // ---------------------------------------------------------------------------------------------- observations
 function toCurated(doc, blobRes) {
   const c = doc.context;
-  const header = { observationId: doc.observationId, versionNo: doc.versionNo, isCurrent: true, status: doc.status, projectCode: c.projectCode, arNumber: c.arNumber, trialNumber: c.trialNumber, variantId: c.variantId, variantNumber: c.variantNumber, sampleCode: c.sampleCode, timePointCode: c.timePointCode, conditionCode: c.conditionCode, formulationClass: c.formulationClass, planId: c.planId, planVersion: c.planVersion, templateId: doc.template.templateId, templateVersion: doc.template.templateVersion, resultType: doc.resultType, overallResult: doc.overallResult, overallResultNA: doc.overallResultNA, observerUserId: doc.observer.userId, observerName: doc.observer.displayName, observedAt: doc.observedAt, submittedAt: doc.submittedAt, reviewedBy: doc.reviewedBy || null, reviewedAt: doc.reviewedAt || null, mediaCount: doc.media.length, blobPath: observationBlobPath(c, doc.observationId), blobVersionId: blobRes?.versionId || null, appendedAt: new Date().toISOString(),
+  const header = { observationId: doc.observationId, versionNo: doc.versionNo, isCurrent: true, status: doc.status, projectCode: c.projectCode, arNumber: c.arNumber, trialNumber: c.trialNumber, variantId: c.variantId, variantNumber: c.variantNumber, sampleCode: c.sampleCode, timePointCode: c.timePointCode, conditionCode: c.conditionCode, formulationClass: c.formulationClass, planId: c.planId, planVersion: c.planVersion, templateId: doc.template.templateId, templateVersion: doc.template.templateVersion, resultType: doc.resultType, overallResult: doc.overallResult, overallResultNA: doc.overallResultNA, observerUserId: doc.observer.userId, observerName: doc.observer.displayName, observedAt: doc.observedAt, submittedAt: doc.submittedAt, reviewedBy: doc.reviewedBy || null, reviewedAt: doc.reviewedAt || null, mediaCount: doc.media.length, blobPath: observationBlobPath(c, doc.observationId, doc.displayName), blobVersionId: blobRes?.versionId || null, appendedAt: new Date().toISOString(), displayName: doc.displayName,
     excludeFromTrend: doc.values.some((v) => v.fieldCode === 'exclude_from_trend' && v.value === true), shakeProtocol: doc.values.find((v) => v.fieldCode === 'shake_protocol')?.value || null };
   const values = doc.values.map((v) => ({ observationId: doc.observationId, versionNo: doc.versionNo, fieldCode: v.fieldCode, domainCode: v.domainCode, dataType: v.dataType, valueText: v.isNA ? null : (v.value === null || v.value === undefined ? null : Array.isArray(v.value) ? v.value.join('|') : String(v.value)), valueNumber: !v.isNA && typeof v.value === 'number' ? v.value : null, valueBoolean: !v.isNA && typeof v.value === 'boolean' ? v.value : null, unit: v.unit, isNA: v.isNA, naReason: v.naReason, mediaAssetId: v.mediaAssetId, sampleCode: c.sampleCode, timePointCode: c.timePointCode, conditionCode: c.conditionCode, arNumber: c.arNumber, projectCode: c.projectCode, observedAt: doc.observedAt }));
   const media = doc.media.map((m) => ({ ...m, observationId: doc.observationId, versionNo: doc.versionNo, sampleCode: c.sampleCode, timePointCode: c.timePointCode, conditionCode: c.conditionCode, arNumber: c.arNumber, projectCode: c.projectCode }));
@@ -87,7 +87,7 @@ async function updateIndex(arNumber, mutate) {
   }
   throw new Error('Index update kept conflicting; try again');
 }
-function headerFor(doc, blobRes) { return { ...toCurated(doc, blobRes).header }; }
+function headerFor(doc, blobRes) { return { ...toCurated(doc, blobRes).header, displayName: doc.displayName }; }
 
 export const observations = {
   async list(filters = {}) {
@@ -163,11 +163,13 @@ export const observations = {
     }
     // Versioning: a resubmission of an existing observationId becomes versionNo + 1 and points at the previous document version
     const existing = await this.get(doc.observationId, doc.context.arNumber);
+    const displayName = observationDisplayName(doc.context);
+    doc.displayName = displayName;
     if (existing) {
       if (existing.observer.userId !== actor.userId && actor.role === 'SCIENTIST') { const e = new Error('Only the original observer or a reviewer can amend this observation'); e.status = 403; throw e; }
-      doc.versionNo = existing.versionNo + 1; doc.audit = { ...doc.audit, previousVersionUri: existing.storage?.blobPath || observationBlobPath(existing.context, existing.observationId), previousVersionId: existing.storage?.versionId || null };
+      doc.versionNo = existing.versionNo + 1; doc.audit = { ...doc.audit, previousVersionUri: existing.storage?.blobPath || observationBlobPath(existing.context, existing.observationId, displayName), previousVersionId: existing.storage?.versionId || null };
     } else doc.versionNo = 1;
-    const path = observationBlobPath(doc.context, doc.observationId);
+    const path = observationBlobPath(doc.context, doc.observationId, displayName);
     let written = null;
     try {
       written = await blob.putJson(C.observations, path, doc, { metadata: { observationid: doc.observationId, version: String(doc.versionNo), project: doc.context.projectCode, ar: doc.context.arNumber, status: doc.status }, ifNoneMatch: existing ? undefined : '*' });
@@ -193,7 +195,7 @@ export const observations = {
     if (!doc) { const e = new Error('Observation not found'); e.status = 404; throw e; }
     if (doc.status !== 'SUBMITTED') { const e = new Error(`Observation is ${doc.status}, only SUBMITTED observations can be reviewed`); e.status = 409; throw e; }
     doc.status = action === 'REJECT' ? 'REJECTED' : 'REVIEWED'; doc.reviewedBy = actor.userId; doc.reviewedAt = new Date().toISOString(); doc.reviewNote = note || null;
-    const path = observationBlobPath(doc.context, doc.observationId);
+    const path = observationBlobPath(doc.context, doc.observationId, doc.displayName);
     const { storage, ...clean } = doc;
     const written = await blob.putJson(C.observations, path, clean, { metadata: { observationid: doc.observationId, version: String(doc.versionNo), status: doc.status } });
     await blob.appendNdjson('observation_header', [toCurated(clean, written).header]);

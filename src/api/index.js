@@ -5,7 +5,8 @@ import { observationBlobPath } from '../lib/naming.js';
 import { getAccessToken } from '../auth/auth.js';
 
 const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
-export const DEMO_MODE = !API_BASE;
+export const DEMO_MODE = import.meta.env.DEV || import.meta.env.MODE === 'mockup' || (import.meta.env.MODE !== 'production' && !API_BASE && !import.meta.env.VITE_FORCE_API);
+const USE_RELATIVE_API = !API_BASE && !DEMO_MODE;
 
 // -------------------------------------------------------------------------------------------------
 // Demo implementation: everything in memory, same shapes as the Express API
@@ -105,7 +106,8 @@ const demoApi = {
 // -------------------------------------------------------------------------------------------------
 async function http(path, { method = 'GET', body, headers = {} } = {}) {
   const token = await getAccessToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = USE_RELATIVE_API ? path : `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),

@@ -5,6 +5,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 // `npm run build`        -> dist/          deploy to Azure Web App (served by the Express API or Static Web App)
 // `npm run build:mockup` -> dist-mockup/   one self-contained HTML file that runs in demo mode (no backend)
 export default defineConfig(({ mode }) => ({
+  base: '/',
   plugins: [react(), ...(mode === 'mockup' ? [viteSingleFile()] : [])],
   build: {
     outDir: mode === 'mockup' ? 'dist-mockup' : 'dist',

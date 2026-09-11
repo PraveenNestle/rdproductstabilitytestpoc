@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { api, DEMO_MODE } from './api/index.js';
 import { initAuth, currentUser, onUserChange, switchDemoUser, demoUsers, authMode, can, signOut } from './auth/auth.js';
 import { ToastProvider, useToast } from './components/ui.jsx';
@@ -15,7 +16,9 @@ function Shell() {
   const toast = useToast();
   const [user, setUser] = useState(null);
   const [catalog, setCatalog] = useState(null);
-  const [route, setRoute] = useState({ name: 'home' });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { focusId } = useParams();
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [pending, setPending] = useState(queued().length);
 
@@ -23,7 +26,6 @@ function Shell() {
   const reloadCatalog = useCallback(() => api.getCatalog().then(setCatalog), []);
   useEffect(() => { reloadCatalog(); }, [reloadCatalog]);
 
-  // Flush the offline queue when connectivity returns (R-36)
   useEffect(() => onConnectivity(async (isOnline) => {
     setOnline(isOnline);
     if (!isOnline) return;
@@ -33,16 +35,29 @@ function Shell() {
     setPending(queued().length);
   }), [toast]);
 
-  const go = (name, params = {}) => { setRoute({ name, ...params }); window.scrollTo({ top: 0 }); };
+  const go = useCallback((name, params = {}) => {
+    if (name === 'capture' && params.ctx) {
+      navigate('/capture', { state: { ctx: params.ctx } });
+    } else if (name === 'review' && params.focusId) {
+      navigate(`/review/${params.focusId}`);
+    } else {
+      navigate(`/${name}`);
+    }
+    window.scrollTo({ top: 0 });
+  }, [navigate]);
+
   if (!user || !catalog) return <div className="empty"><h3>Loading Stability Capture</h3>{authMode() === 'msal' ? 'Signing in with Microsoft Entra ID' : 'Preparing demo data'}</div>;
 
   const initials = user.displayName.split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+  const captureState = location.state || {};
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand"><span className="brand-mark">SC</span>Stability Capture</div>
         <nav className="nav" aria-label="Main">
-          {NAV.filter(([, , perm]) => can(user, perm)).map(([k, l]) => <button key={k} onClick={() => go(k)} aria-current={route.name === k ? 'page' : undefined}>{l}</button>)}
+          {NAV.filter(([, , perm]) => can(user, perm)).map(([k, l]) => (
+            <button key={k} onClick={() => go(k)} aria-current={(k === 'home' && location.pathname === '/') || (k === 'capture' && location.pathname === '/capture') || (k === 'review' && location.pathname.startsWith('/review')) || (k === 'templates' && location.pathname === '/templates') || (k === 'admin' && location.pathname === '/admin') ? 'page' : undefined}>{l}</button>
+          ))}
         </nav>
         <div className="topbar-right">
           {!online && <span className="pill offline">Offline</span>}
@@ -61,14 +76,25 @@ function Shell() {
         </div>
       </header>
       <main className="main">
-        {route.name === 'home' && <HomeScreen catalog={catalog} user={user} onCapture={(ctx) => go('capture', { ctx })} onReview={(id) => go('review', { focusId: id })} />}
-        {route.name === 'capture' && <CaptureScreen key={JSON.stringify(route.ctx || {})} catalog={catalog} user={user} online={online} initialContext={route.ctx} onSubmitted={() => setPending(queued().length)} />}
-        {route.name === 'review' && <ReviewScreen catalog={catalog} user={user} focusId={route.focusId} onOpenCapture={(ctx) => go('capture', { ctx })} />}
-        {route.name === 'templates' && <TemplatesScreen catalog={catalog} user={user} />}
-        {route.name === 'admin' && (can(user, 'admin') ? <AdminScreen catalog={catalog} user={user} onCatalogChange={reloadCatalog} /> : <div className="card">Administration is limited to the admin role.</div>)}
+        <Routes>
+          <Route path="/" element={<HomeScreen catalog={catalog} user={user} onCapture={(ctx) => go('capture', { ctx })} onReview={(id) => go('review', { focusId: id })} />} />
+          <Route path="/capture" element={<CaptureScreen catalog={catalog} user={user} online={online} initialContext={captureState.ctx} onSubmitted={(doc) => { setPending(queued().length); go('review', { focusId: doc.observationId }); }} />} />
+          <Route path="/review" element={<ReviewScreen catalog={catalog} user={user} focusId={focusId} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
+          <Route path="/review/:focusId" element={<ReviewScreen catalog={catalog} user={user} focusId={focusId} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
+          <Route path="/templates" element={<TemplatesScreen catalog={catalog} user={user} />} />
+          <Route path="/admin" element={can(user, 'admin') ? <AdminScreen catalog={catalog} user={user} onCatalogChange={reloadCatalog} /> : <div className="card">Administration is limited to the admin role.</div>} />
+        </Routes>
       </main>
     </div>
   );
 }
 
-export default function App() { return <ToastProvider><Shell /></ToastProvider>; }
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </BrowserRouter>
+  );
+}

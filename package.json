@@ -8,6 +8,8 @@
     "start": "node sdct/backend/api/src/server.js",
     "postinstall": "npm install --prefix sdct/backend/api --omit=dev",
     "dev": "vite",
+    "dev:api": "node sdct/backend/api/src/server.js",
+    "dev:all": "concurrently -n API,VITE -c green,cyan \"npm run dev:api\" \"npm run dev\"",
     "build": "vite build",
     "build:mockup": "vite build --mode mockup",
     "preview": "vite preview"
@@ -15,10 +17,12 @@
   "dependencies": {
     "@azure/msal-browser": "^3.20.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.1.0",
     "vite": "^5.4.2",
     "vite-plugin-singlefile": "^2.0.2"
   }

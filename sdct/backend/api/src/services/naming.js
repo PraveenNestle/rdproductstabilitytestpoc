@@ -59,7 +59,13 @@ export function mediaBlobPath(ctx, filename) {
   return [sanitizeToken(ctx.projectCode, { allowHyphen: false }), sanitizeToken(ctx.arNumber), sanitizeToken(ctx.trialNumber), filename].join('/');
 }
 
-// Blob path under the observations container: {PROJECT}/{AR}/{TRIAL}/{observationId}.json (blob versioning keeps history)
-export function observationBlobPath(ctx, observationId) {
-  return [sanitizeToken(ctx.projectCode, { allowHyphen: false }), sanitizeToken(ctx.arNumber), sanitizeToken(ctx.trialNumber), `${observationId}.json`].join('/');
+// Blob path under the observations container: {PROJECT}/{AR}/{TRIAL}/{displayName}_{observationId}.json (blob versioning keeps history)
+export function observationBlobPath(ctx, observationId, displayName) {
+  const name = displayName ? `${sanitizeToken(displayName)}_${observationId}` : observationId;
+  return [sanitizeToken(ctx.projectCode, { allowHyphen: false }), sanitizeToken(ctx.arNumber), sanitizeToken(ctx.trialNumber), `${name}.json`].join('/');
+}
+
+// Display name for the observation document, shown in Review and used as a human-readable blob filename prefix
+export function observationDisplayName(ctx) {
+  return [ctx.sampleCode, ctx.variantNumber, ctx.conditionCode].filter(Boolean).join('-');
 }

@@ -18,11 +18,12 @@ export function ObservationDetail({ obs, catalog, vocabIndex, onReview, canRevie
     return `${v.value}${v.unit ? ` ${v.unit}` : ''}`;
   };
   const c = obs.context;
+  const displayName = obs.displayName || [c.sampleCode, c.variantNumber, c.conditionCode].filter(Boolean).join('-');
   return (
     <div className="card detail">
       <div className="row spread" style={{ alignItems: 'flex-start' }}>
         <div>
-          <h2 style={{ marginBottom: 2 }}>{c.sampleCode}</h2>
+          <h2 style={{ marginBottom: 2 }}>{displayName}</h2>
           <div className="small muted">{c.projectCode} · {c.arNumber} · {c.trialNumber} · {c.variantNumber}</div>
         </div>
         <StatusPill status={obs.status} />

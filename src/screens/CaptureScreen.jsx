@@ -7,7 +7,7 @@ import { isVisible } from '../lib/branching.js';
 import { validateObservation, completeness, isRequired, isSystemField } from '../lib/validation.js';
 import { saveDraft, loadDraft, clearDraft, enqueue } from '../lib/offlineQueue.js';
 import { uuid } from '../lib/format.js';
-import { observationBlobPath } from '../lib/naming.js';
+import { observationBlobPath, observationDisplayName } from '../lib/naming.js';
 import { suggestAll, RATING_FIELDS } from '../lib/ratings.js';
 
 export function CaptureScreen({ catalog, user, online, initialContext, onSubmitted }) {
@@ -119,6 +119,7 @@ export function CaptureScreen({ catalog, user, online, initialContext, onSubmitt
     const overall = values.overall_result;
     return {
       schemaVersion: '1.0', observationId: observationIdRef.current, versionNo: 1, status,
+      displayName: observationDisplayName(ctx),
       context: { projectCode: ctx.projectCode, arNumber: ctx.arNumber, trialNumber: ctx.trialNumber, variantId: ctx.variantId || null, variantNumber: ctx.variantNumber || null, sampleCode: ctx.sampleCode, timePointCode: ctx.timePointCode, conditionCode: ctx.conditionCode, formulationClass: ctx.formulationClass, planId: plan?.planId || null, planVersion: plan?.planVersion || null, sourceSystem: 'REFERENCE_STORE' },
       template: { templateId: template.templateId, templateVersion: template.version, templateName: template.templateName },
       resultType: values.result_type?.value || 'SCHEDULED', overallResult: overall?.isNA ? null : overall?.value || null, overallResultNA: !!overall?.isNA,
@@ -142,6 +143,13 @@ export function CaptureScreen({ catalog, user, online, initialContext, onSubmitt
     try {
       if (!online) throw new Error('offline');
       const res = await api.submitObservation(doc, files);
+      console.log('Submitted observation JSON:', doc);
+      console.log('Container chunks:', {
+        observations: { ...doc, media: doc.media?.map(m => ({ ...m, blobUri: `https://<storageaccount>.blob.core.windows.net/media/${m.blobPath}`, _ctx: undefined })) },
+        media: doc.media?.map(m => ({ mediaAssetId: m.mediaAssetId, blobPath: m.blobPath, contentType: m.contentType, fieldCode: m.fieldCode, standardFilename: m.standardFilename, observationId: doc.observationId })) || [],
+        curated: doc.values?.map(v => ({ observationId: doc.observationId, fieldCode: v.fieldCode, value: v.isNA ? null : v.value, isNA: v.isNA, observedAt: doc.observedAt, sampleCode: doc.context.sampleCode, arNumber: doc.context.arNumber, trialNumber: doc.context.trialNumber, timePointCode: doc.context.timePointCode, conditionCode: doc.context.conditionCode, observer: doc.observer.displayName })) || [],
+        reference: { context: doc.context, template: doc.template },
+      });
       clearDraft(draftKey); setValues(freshValues()); setProblems([]); observationIdRef.current = uuid();
       setExisting((e) => [{ ...doc, storage: { blobPath: res.blobPath } }, ...e]);
       toast(`Submitted ${doc.context.sampleCode} at ${doc.context.timePointCode}. ${files.length} media file${files.length === 1 ? '' : 's'} named to the standard.`, 'ok');
@@ -329,7 +337,7 @@ function headerValue(f, ctx, sample, user, vocabIndex, condLabels) {
     default: return undefined;
   }
 }
-function sanitizeMedia(m, ctx) { const { previewUrl, file, ...rest } = m; return { ...rest, blobUri: `https://<storageaccount>.blob.core.windows.net/media/${rest.blobPath}`, checksumSha256: null, _ctx: undefined, ...(ctx ? {} : {}) }; }
+function sanitizeMedia(m, ctx) { const { previewUrl, file, ...rest } = m; return { ...rest, blobUri: `https://namsdvsrmcoreuseasta.blob.core.windows.net/media/${rest.blobPath}`, checksumSha256: null, _ctx: undefined, ...(ctx ? {} : {}) }; }
 function stripFiles(values) { const out = {}; Object.entries(values).forEach(([k, e]) => { out[k] = Array.isArray(e?.value) && e.value[0]?.mediaAssetId ? { ...e, value: e.value.map(({ file, previewUrl, ...m }) => m) } : e; }); return out; }
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 const freshValues = () => ({ observation_timestamp: { value: new Date().toISOString(), isNA: false, naReason: null }, result_type: { value: 'SCHEDULED', isNA: false, naReason: null }, shake_protocol: { value: 'SOP_10X_180', isNA: false, naReason: null } });
