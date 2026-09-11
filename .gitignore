@@ -9,3 +9,6 @@ npm-debug.log*
 # Local Azure and editor state
 .azure/
 .vscode/
+
+# Archives and OneDrive temp files
+*.zip

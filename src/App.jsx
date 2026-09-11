@@ -12,19 +12,23 @@ import { onConnectivity, queued, dequeue } from './lib/offlineQueue.js';
 
 const NAV = [['home', 'Home', 'view'], ['capture', 'Capture', 'capture'], ['review', 'Review', 'view'], ['templates', 'Templates', 'view'], ['admin', 'Admin', 'admin']];
 
+function ReviewWrapper({ catalog, user, onOpenCapture }) {
+  const { focusId } = useParams();
+  return <ReviewScreen catalog={catalog} user={user} focusId={focusId} onOpenCapture={onOpenCapture} />;
+}
+
 function Shell() {
   const toast = useToast();
   const [user, setUser] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { focusId } = useParams();
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [pending, setPending] = useState(queued().length);
 
   useEffect(() => { initAuth().then(setUser); return onUserChange(setUser); }, []);
   const reloadCatalog = useCallback(() => api.getCatalog().then(setCatalog), []);
-  useEffect(() => { reloadCatalog(); }, [reloadCatalog]);
+  useEffect(() => { if (user) reloadCatalog(); }, [user, reloadCatalog]);
 
   useEffect(() => onConnectivity(async (isOnline) => {
     setOnline(isOnline);
@@ -40,6 +44,8 @@ function Shell() {
       navigate('/capture', { state: { ctx: params.ctx } });
     } else if (name === 'review' && params.focusId) {
       navigate(`/review/${params.focusId}`);
+    } else if (name === 'review') {
+      navigate('/review');
     } else {
       navigate(`/${name}`);
     }
@@ -53,10 +59,10 @@ function Shell() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">SC</span>Stability Capture</div>
+        <div className="brand" role="button" tabIndex={0} onClick={() => go('home')} onKeyDown={(e) => e.key === 'Enter' && go('home')}><span className="brand-mark">SC</span>Stability Capture</div>
         <nav className="nav" aria-label="Main">
           {NAV.filter(([, , perm]) => can(user, perm)).map(([k, l]) => (
-            <button key={k} onClick={() => go(k)} aria-current={(k === 'home' && location.pathname === '/') || (k === 'capture' && location.pathname === '/capture') || (k === 'review' && location.pathname.startsWith('/review')) || (k === 'templates' && location.pathname === '/templates') || (k === 'admin' && location.pathname === '/admin') ? 'page' : undefined}>{l}</button>
+            <button key={k} onClick={() => go(k)} aria-current={(k === 'home' && (location.pathname === '/' || location.pathname === '/home')) || (k === 'capture' && location.pathname === '/capture') || (k === 'review' && location.pathname.startsWith('/review')) || (k === 'templates' && location.pathname === '/templates') || (k === 'admin' && location.pathname === '/admin') ? 'page' : undefined}>{l}</button>
           ))}
         </nav>
         <div className="topbar-right">
@@ -78,9 +84,10 @@ function Shell() {
       <main className="main">
         <Routes>
           <Route path="/" element={<HomeScreen catalog={catalog} user={user} onCapture={(ctx) => go('capture', { ctx })} onReview={(id) => go('review', { focusId: id })} />} />
+          <Route path="/home" element={<HomeScreen catalog={catalog} user={user} onCapture={(ctx) => go('capture', { ctx })} onReview={(id) => go('review', { focusId: id })} />} />
           <Route path="/capture" element={<CaptureScreen catalog={catalog} user={user} online={online} initialContext={captureState.ctx} onSubmitted={(doc) => { setPending(queued().length); go('review', { focusId: doc.observationId }); }} />} />
-          <Route path="/review" element={<ReviewScreen catalog={catalog} user={user} focusId={focusId} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
-          <Route path="/review/:focusId" element={<ReviewScreen catalog={catalog} user={user} focusId={focusId} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
+          <Route path="/review" element={<ReviewWrapper catalog={catalog} user={user} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
+          <Route path="/review/:focusId" element={<ReviewWrapper catalog={catalog} user={user} onOpenCapture={(ctx) => go('capture', { ctx })} />} />
           <Route path="/templates" element={<TemplatesScreen catalog={catalog} user={user} />} />
           <Route path="/admin" element={can(user, 'admin') ? <AdminScreen catalog={catalog} user={user} onCatalogChange={reloadCatalog} /> : <div className="card">Administration is limited to the admin role.</div>} />
         </Routes>
